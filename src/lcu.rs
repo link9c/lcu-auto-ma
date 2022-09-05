@@ -1,7 +1,7 @@
 // 从lcu获取port token 地址等 返回 结构体ClientInfo
 #![allow(non_snake_case)]
 #![allow(dead_code)]
-use std::process::{Command, Stdio};
+use std::{process::{Command, Stdio}, time::Duration};
 
 use anyhow::Result;
 use reqwest::Client;
@@ -90,6 +90,7 @@ impl ApiClient {
 
     pub async fn get_lobby(self) -> Result<Value> {
         let url = self.base_url + "/lol-lobby/v2/lobby";
+      
         let resp = self
             .client
             .unwrap()
@@ -108,13 +109,16 @@ impl ApiClient {
 
     pub async fn summoner(self) -> Result<Summoner> {
         let url = self.base_url + "/lol-summoner/v1/current-summoner";
+        println!("{}",url);
         let resp = self
             .client
             .unwrap()
             .get(url)
             // .bearer_auth("cmlvdDp0end5R0FGZnVrbG9OWnlFZ1VSMDJ3")
             .basic_auth("riot", Some(self.token.as_str()))
+            .timeout(Duration::new(2, 0))
             .send()
+            
             .await?
             // .json::<HashMap<String, String>>()
             .text()
@@ -142,6 +146,8 @@ pub struct Summoner {
     xpUntilNextLevel: u32,
     rerollPoints: RerollPoints,
 }
+
+
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 struct RerollPoints {

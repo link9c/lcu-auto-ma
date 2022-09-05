@@ -1,54 +1,34 @@
 mod lcu;
-// mod async_func;
+mod worker;
 // use anyhow::Result;
-use lcu::{ApiClient, Summoner};
+use lcu::Summoner;
+use worker::{Message, WorkEvent, WorkInput, WorkMap, WorkerSender};
 // use std::collections::HashMap;\
 
 use iced::{
     button, executor, window, Application, Button, Column, Command, Container, Element, Settings,
     Subscription, Text,
 };
-use tokio::runtime::Handle;
 
 #[derive(Default)]
 pub struct MainUI {
     refresh_button: button::State,
     account: Option<Summoner>,
-    api: ApiClient,
-}
-
-fn fresh_summoner(api:ApiClient)->Option<Summoner>{
-    let summ = tokio::task::block_in_place(move || {
-        Handle::current().block_on(async move { api.summoner().await })
-    });
-
-    match summ {
-        Ok(v) => Some(v),
-        Err(e) => {
-            println!("error:{}", e);
-            None
-        }
-    }
+    // api: ApiClient,
+    worker_list: Vec<WorkMap>,
+    work_sender: WorkerSender,
 }
 
 impl MainUI {
     fn new() -> MainUI {
-        let mut api = ApiClient::default();
-        api.init_client();
-        let ss = fresh_summoner(api);
-
         MainUI {
             refresh_button: button::State::new(),
-            account: ss,
-            api: ApiClient::default(),
+            account: None,
+            // api: ApiClient::default(),
+            worker_list: vec![WorkMap::new(0)],
+            work_sender: WorkerSender::default(),
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum Message {
-    Send,
-    Refresh,
 }
 
 impl Application for MainUI {
@@ -75,10 +55,20 @@ impl Application for MainUI {
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
-            Message::Send => {}
+            Message::WokerConnect(event) => match event {
+                WorkEvent::Ready(s) => {
+                    self.work_sender.sender = Some(s);
+                }
+                WorkEvent::WorkReturn(o) => {
+                    println!("{:?}", o);
+                    self.account = Some(o);
+                }
+                WorkEvent::Finished => {}
+            },
             Message::Refresh => {
-                self.api.init_client();
-                self.account = fresh_summoner(self.api.clone());
+                let r = await_sender(self.work_sender.clone(), WorkInput::Refresh);
+
+                println!("send result:{:?}", r);
             }
         }
 
@@ -86,7 +76,7 @@ impl Application for MainUI {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        Subscription::none()
+        Subscription::batch(self.worker_list.iter().map(WorkMap::subscription))
     }
 }
 
@@ -100,7 +90,7 @@ async fn main() {
             resizable: true,
             decorations: true,
             transparent: false,
-            always_on_top: true,
+            always_on_top: false,
             position: window::Position::Specific(5, 466),
             icon: None,
         },
@@ -108,4 +98,16 @@ async fn main() {
         // default_font: Some(include_bytes!("C:/Windows/Fonts/SIMHEI.TTF")),
         ..Settings::default()
     });
+}
+
+fn await_sender(
+    work_sender: WorkerSender,
+    input: WorkInput,
+) -> Result<(), iced::futures::channel::mpsc::SendError> {
+    let mut sender = work_sender.sender.unwrap();
+    sender.start_send(input)
+    // tokio::task::block_in_place(move || {
+    //     tokio::runtime::Handle::current()
+    //         .block_on(async move { sender.send(WorkInput::Refresh).await })
+    // })
 }

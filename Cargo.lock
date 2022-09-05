@@ -1043,6 +1043,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "iced",
+ "iced_native",
  "reqwest",
  "serde",
  "serde_json",
