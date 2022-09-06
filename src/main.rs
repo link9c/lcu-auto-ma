@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 mod lcu;
 mod worker;
 // use anyhow::Result;

@@ -2,7 +2,7 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 use std::{process::{Command, Stdio}, time::Duration};
-
+use std::os::windows::process::CommandExt;
 use anyhow::Result;
 use reqwest::Client;
 use std::collections::HashMap;
@@ -19,6 +19,7 @@ struct BaseInfo {
 impl BaseInfo {
     pub fn init(&mut self) -> Result<(), std::io::Error> {
         let out = Command::new("cmd")
+        .creation_flags(0x08000000)
             .arg("/c")
             .arg("wmic PROCESS WHERE name='LeagueClientUx.exe' GET commandline")
             .stdout(Stdio::piped())
