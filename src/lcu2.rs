@@ -6,9 +6,9 @@ use std::os::windows::process::CommandExt;
 use anyhow::Result;
 use reqwest::Client;
 use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
 
 #[derive(Default)]
 struct BaseInfo {
@@ -130,31 +130,4 @@ impl ApiClient {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct Summoner {
-    pub accountId: u32,
-    pub displayName: String,
-    internalName: String,
-    nameChangeFlag: bool,
-    percentCompleteForNextLevel: u32,
-    privacy: String,
-    profileIconId: u32,
-    puuid: String,
-    pub summonerId: u32,
-    pub summonerLevel: u16,
-    unnamed: bool,
-    xpSinceLastLevel: u32,
-    xpUntilNextLevel: u32,
-    rerollPoints: RerollPoints,
-}
 
-
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-struct RerollPoints {
-    currentPoints: u32,
-    maxRolls: u8,
-    numberOfRolls: u8,
-    pointsCostToRoll: u32,
-    pointsToReroll: u32,
-}

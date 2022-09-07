@@ -1,26 +1,40 @@
+use std::sync::Arc;
+
+use crate::lcu::api::ApiClient;
 // use iced::{futures::channel::mpsc, Subscription};
-use crate::lcu::{self, Summoner};
+use crate::lcu::entity::{LCUpackage, Summoner};
+
 // use anyhow::Result;
 use iced_native::futures::channel::mpsc;
 use iced_native::subscription::{self, Subscription};
+use lazy_static::lazy_static;
+use tokio::sync::{Mutex, MutexGuard};
+
+lazy_static! {
+    static ref API: Arc<Mutex<ApiClient>> = Arc::new(Mutex::new({
+        let mut ac = ApiClient::default();
+        ac.init_client();
+        ac
+    }));
+}
 #[derive(Debug, Clone)]
 pub enum WorkEvent {
     Ready(mpsc::Sender<WorkInput>),
-    WorkReturn(Summoner),
-    Finished
-    // Ready
+    WorkReturn(LCUpackage),
+    Finished, // Ready
 }
 #[derive(Debug, Clone)]
 pub enum WorkInput {
     Pending,
     Refresh,
+    SendMessage,
+    Init,
 }
 #[derive(Debug)]
 pub enum WorkState {
     Starting,
     Ready(mpsc::Receiver<WorkInput>),
-    Finished
-    
+    Finished,
 }
 
 pub struct WorkMap {
@@ -41,6 +55,7 @@ impl WorkMap {
 pub enum Message {
     WokerConnect(WorkEvent),
     Refresh,
+    SendMessage,
 }
 
 pub fn factory(id: usize, state: WorkState) -> Subscription<WorkEvent> {
@@ -49,8 +64,7 @@ pub fn factory(id: usize, state: WorkState) -> Subscription<WorkEvent> {
             WorkState::Starting => {
                 let (mut sender, receiver) = mpsc::channel(100);
 
-                
-                let _ = sender.start_send(WorkInput::Refresh);
+                let _ = sender.start_send(WorkInput::Init);
 
                 (Some(WorkEvent::Ready(sender)), WorkState::Ready(receiver))
             }
@@ -62,21 +76,33 @@ pub fn factory(id: usize, state: WorkState) -> Subscription<WorkEvent> {
                 match input {
                     WorkInput::Refresh => {
                         println!("refresh");
-                        let mut api = lcu::ApiClient::default();
+                        let mut api = ApiClient::default();
                         api.init_client();
 
-                        let summ = api.summoner().await.unwrap_or_default();
-                        // println!("aa{:?}",summ);
+                        let mut global_api_client = API.lock().await;
+                        *global_api_client = api;
+
+                        let summ = get_summoner(global_api_client).await;
 
                         (
                             Some(WorkEvent::WorkReturn(summ)),
                             WorkState::Ready(receiver),
                         )
                     }
-                    WorkInput::Pending => { (
-                        Some(WorkEvent::Finished),
-                        WorkState::Finished,
-                    )},
+                    WorkInput::Pending => (Some(WorkEvent::Finished), WorkState::Finished),
+                    WorkInput::SendMessage => {
+                        let mut api = ApiClient::default();
+                        // let lobby = 
+                        (Some(WorkEvent::Finished), WorkState::Ready(receiver))
+                    }
+                    WorkInput::Init => {
+                        let global_api_client = API.lock().await;
+                        let summ = get_summoner(global_api_client).await;
+                        (
+                            Some(WorkEvent::WorkReturn(summ)),
+                            WorkState::Ready(receiver),
+                        )
+                    }
                 }
             }
             WorkState::Finished => {
@@ -89,7 +115,28 @@ pub fn factory(id: usize, state: WorkState) -> Subscription<WorkEvent> {
     })
 }
 
-#[derive(Debug, Default,Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct WorkerSender {
     pub sender: Option<mpsc::Sender<WorkInput>>,
+}
+
+async fn get_summoner(api: MutexGuard<'_, ApiClient>) -> LCUpackage {
+    let lcu_result = api.clone().get_summoner().await;
+
+    let summ = match lcu_result {
+        Ok(v) => {
+            if v.get("errorCode").is_none() {
+                let s = serde_json::from_value::<Summoner>(v).unwrap();
+                s
+            } else {
+                println!("{:#}", v);
+                Summoner::default()
+            }
+        }
+        Err(e) => {
+            println!("{:#}", e);
+            Summoner::default()
+        }
+    };
+    LCUpackage::Summoner(summ)
 }

@@ -1,8 +1,9 @@
-#![windows_subsystem = "windows"]
+// #![windows_subsystem = "windows"]
 mod lcu;
 mod worker;
 // use anyhow::Result;
-use lcu::Summoner;
+use lcu::entity::LCUpackage;
+use lcu::entity::Summoner;
 use worker::{Message, WorkEvent, WorkInput, WorkMap, WorkerSender};
 // use std::collections::HashMap;\
 
@@ -48,7 +49,7 @@ impl Application for MainUI {
         let cname_label = Text::new(self.account.clone().unwrap_or_default().displayName);
 
         let refresh_button =
-            Button::new(&mut self.refresh_button, Text::new("refresh")).on_press(Message::Refresh);
+            Button::new(&mut self.refresh_button, Text::new("refresh")).on_press(Message::SendMessage);
 
         let content = Column::new().push(cname_label).push(refresh_button);
         Container::new(content).center_x().center_y().into()
@@ -60,9 +61,11 @@ impl Application for MainUI {
                 WorkEvent::Ready(s) => {
                     self.work_sender.sender = Some(s);
                 }
-                WorkEvent::WorkReturn(o) => {
-                    println!("{:?}", o);
-                    self.account = Some(o);
+                WorkEvent::WorkReturn(lcu_package) => {
+                    println!("{:?}", lcu_package);
+                    self.account = match lcu_package {
+                        LCUpackage::Summoner(s) => Some(s),
+                    };
                 }
                 WorkEvent::Finished => {}
             },
@@ -70,6 +73,9 @@ impl Application for MainUI {
                 let r = await_sender(self.work_sender.clone(), WorkInput::Refresh);
 
                 println!("send result:{:?}", r);
+            }
+            Message::SendMessage => {
+                let r = await_sender(self.work_sender.clone(), WorkInput::SendMessage);
             }
         }
 
