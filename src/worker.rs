@@ -91,7 +91,7 @@ pub fn factory(id: usize, state: WorkState) -> Subscription<WorkEvent> {
                     }
                     WorkInput::Pending => (Some(WorkEvent::Finished), WorkState::Finished),
                     WorkInput::SendMessage => {
-                        let mut api = ApiClient::default();
+                        // let mut api = ApiClient::default();
                         // let lobby = 
                         (Some(WorkEvent::Finished), WorkState::Ready(receiver))
                     }

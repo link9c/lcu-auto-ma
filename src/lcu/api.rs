@@ -101,10 +101,9 @@ async fn get_resp(url: String, client: Option<Client>, token: String) -> Result<
         .timeout(Duration::new(2, 0))
         .send()
         .await?
-        .text()
+        .json::<Value>()
         .await?;
-    let res = serde_json::from_str::<Value>(&resp)?;
-    Ok(res)
+    Ok(resp)
 }
 mod tests {
 

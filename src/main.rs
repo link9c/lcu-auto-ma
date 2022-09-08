@@ -1,6 +1,8 @@
 // #![windows_subsystem = "windows"]
 mod lcu;
 mod worker;
+use iced::Alignment;
+use iced::Font;
 // use anyhow::Result;
 use lcu::entity::LCUpackage;
 use lcu::entity::Summoner;
@@ -8,8 +10,8 @@ use worker::{Message, WorkEvent, WorkInput, WorkMap, WorkerSender};
 // use std::collections::HashMap;\
 
 use iced::{
-    button, executor, window, Application, Button, Column, Command, Container, Element, Settings,
-    Subscription, Text,
+    button, executor, window, Application, Button, Column, Command, Container, Element, Length,
+    Row, Settings, Subscription, Text,
 };
 
 #[derive(Default)]
@@ -46,12 +48,34 @@ impl Application for MainUI {
     }
 
     fn view(&mut self) -> Element<Message> {
-        let cname_label = Text::new(self.account.clone().unwrap_or_default().displayName);
 
+        // const XQFONT: Font = Font::External {
+        //     name: "方正字体",
+        //     bytes: include_bytes!("C:/Windows/Fonts/SIMYOU.TTF"), // 用 include_bytes 如果路径错误，会提示的
+        // };
         let refresh_button =
-            Button::new(&mut self.refresh_button, Text::new("refresh")).on_press(Message::SendMessage);
+        Button::new(&mut self.refresh_button, Text::new("\\ue056")).on_press(Message::Refresh);
 
-        let content = Column::new().push(cname_label).push(refresh_button);
+        let header_line = Row::new().push(refresh_button).align_items(Alignment::Start);
+        let display_name =
+            Text::new(self.account.clone().unwrap_or_default().displayName).width(Length::Fill);
+
+        let row1_left = Row::new()
+            .push(Text::new("name").width(Length::Units(40)))
+            .push(display_name);
+
+        let row1_right = Row::new()
+            .push(Text::new("id").width(Length::Units(40)))
+            .push(Text::new("123456").width(Length::Fill));
+
+        let col = Row::new()
+            .push(row1_left.width(Length::Fill))
+            .push(row1_right.width(Length::Fill))
+            .align_items(Alignment::Center);
+
+        
+
+        let content = Column::new().push(header_line).push(col);
         Container::new(content).center_x().center_y().into()
     }
 
@@ -102,7 +126,7 @@ async fn main() {
             icon: None,
         },
         // flags: c,
-        // default_font: Some(include_bytes!("C:/Windows/Fonts/SIMHEI.TTF")),
+        default_font: Some(include_bytes!("../方正准圆简体.ttf")),
         ..Settings::default()
     });
 }
