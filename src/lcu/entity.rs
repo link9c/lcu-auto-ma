@@ -28,7 +28,7 @@ pub struct Summoner {
     pub accountId: u32,
     pub displayName: String,
     pub internalName: String,
-    nameChangeFlag: bool,
+    // nameChangeFlag: bool,
     percentCompleteForNextLevel: u32,
     privacy: String,
     profileIconId: u32,

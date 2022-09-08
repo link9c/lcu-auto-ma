@@ -92,14 +92,14 @@ impl Application for MainUI {
                 }
                 WorkEvent::WorkReturn(lcu_result) => {
                     println!("{:?}", lcu_result);
-                    self.account = match lcu_result {
+                    match lcu_result {
                         lcu::entity::LcuResult::Ok(pack) => match pack {
-                            LcuPackage::Summoner(s) => Some(s),
+                            LcuPackage::Summoner(s) => self.account = Some(s),
                         },
                         lcu::entity::LcuResult::Err(err) => {
                             let mut sm = Summoner::default();
                             sm.match_err_then(err);
-                            Some(sm)
+                            self.account = Some(sm);
                         }
                     };
                 }
