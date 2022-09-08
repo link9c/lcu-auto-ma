@@ -2,10 +2,8 @@
 mod lcu;
 mod worker;
 use iced::Alignment;
-use iced::Font;
 // use anyhow::Result;
-use lcu::entity::LCUpackage;
-use lcu::entity::Summoner;
+use lcu::entity::{LcuPackage, SetErrDefault, Summoner};
 use worker::{Message, WorkEvent, WorkInput, WorkMap, WorkerSender};
 // use std::collections::HashMap;\
 
@@ -17,6 +15,7 @@ use iced::{
 #[derive(Default)]
 pub struct MainUI {
     refresh_button: button::State,
+    send_button: button::State,
     account: Option<Summoner>,
     // api: ApiClient,
     worker_list: Vec<WorkMap>,
@@ -27,6 +26,7 @@ impl MainUI {
     fn new() -> MainUI {
         MainUI {
             refresh_button: button::State::new(),
+            send_button: button::State::new(),
             account: None,
             // api: ApiClient::default(),
             worker_list: vec![WorkMap::new(0)],
@@ -48,24 +48,29 @@ impl Application for MainUI {
     }
 
     fn view(&mut self) -> Element<Message> {
-
         // const XQFONT: Font = Font::External {
         //     name: "方正字体",
         //     bytes: include_bytes!("C:/Windows/Fonts/SIMYOU.TTF"), // 用 include_bytes 如果路径错误，会提示的
         // };
         let refresh_button =
-        Button::new(&mut self.refresh_button, Text::new("\\ue056")).on_press(Message::Refresh);
+            Button::new(&mut self.refresh_button, Text::new("刷新")).on_press(Message::Refresh);
 
-        let header_line = Row::new().push(refresh_button).align_items(Alignment::Start);
+        let send_button =
+            Button::new(&mut self.send_button, Text::new("发送")).on_press(Message::SendMessage);
+
+        let header_line = Row::new()
+            .push(refresh_button)
+            .push(send_button)
+            .align_items(Alignment::Start);
         let display_name =
             Text::new(self.account.clone().unwrap_or_default().displayName).width(Length::Fill);
 
         let row1_left = Row::new()
-            .push(Text::new("name").width(Length::Units(40)))
+            .push(Text::new("姓名:").width(Length::Units(40)))
             .push(display_name);
 
         let row1_right = Row::new()
-            .push(Text::new("id").width(Length::Units(40)))
+            .push(Text::new("id:").width(Length::Units(40)))
             .push(Text::new("123456").width(Length::Fill));
 
         let col = Row::new()
@@ -73,9 +78,9 @@ impl Application for MainUI {
             .push(row1_right.width(Length::Fill))
             .align_items(Alignment::Center);
 
-        
-
-        let content = Column::new().push(header_line).push(col);
+        let content = Column::new().push(header_line).push(col).push(Text::new(
+            self.account.clone().unwrap_or_default().internalName,
+        ));
         Container::new(content).center_x().center_y().into()
     }
 
@@ -85,10 +90,17 @@ impl Application for MainUI {
                 WorkEvent::Ready(s) => {
                     self.work_sender.sender = Some(s);
                 }
-                WorkEvent::WorkReturn(lcu_package) => {
-                    println!("{:?}", lcu_package);
-                    self.account = match lcu_package {
-                        LCUpackage::Summoner(s) => Some(s),
+                WorkEvent::WorkReturn(lcu_result) => {
+                    println!("{:?}", lcu_result);
+                    self.account = match lcu_result {
+                        lcu::entity::LcuResult::Ok(pack) => match pack {
+                            LcuPackage::Summoner(s) => Some(s),
+                        },
+                        lcu::entity::LcuResult::Err(err) => {
+                            let mut sm = Summoner::default();
+                            sm.match_err_then(err);
+                            Some(sm)
+                        }
                     };
                 }
                 WorkEvent::Finished => {}
@@ -99,7 +111,7 @@ impl Application for MainUI {
                 println!("send result:{:?}", r);
             }
             Message::SendMessage => {
-                let r = await_sender(self.work_sender.clone(), WorkInput::SendMessage);
+                let _r = await_sender(self.work_sender.clone(), WorkInput::SendMessage);
             }
         }
 
@@ -137,8 +149,4 @@ fn await_sender(
 ) -> Result<(), iced::futures::channel::mpsc::SendError> {
     let mut sender = work_sender.sender.unwrap();
     sender.start_send(input)
-    // tokio::task::block_in_place(move || {
-    //     tokio::runtime::Handle::current()
-    //         .block_on(async move { sender.send(WorkInput::Refresh).await })
-    // })
 }
