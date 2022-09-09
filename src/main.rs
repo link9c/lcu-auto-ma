@@ -14,7 +14,7 @@ use iced::{
 
 use lcu::winhook::loop_send_by_key;
 
-static mut flag:bool = false;
+static mut AUTO:bool = false;
 #[derive(Default)]
 pub struct MainUI {
     refresh_button: button::State,
@@ -125,7 +125,7 @@ impl Application for MainUI {
             }
             Message::Auto => {
                 unsafe {
-                    flag = !flag;
+                    AUTO = !AUTO;
                 }
             }
         }
@@ -148,7 +148,7 @@ async fn main() {
     let _ = std::thread::spawn(|| loop {
         std::thread::sleep(std::time::Duration::new(2, 0));
         unsafe{
-            if flag == true{
+            if AUTO {
                 println!("looping");
             }
         }

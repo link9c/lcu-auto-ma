@@ -41,9 +41,7 @@ extern "system" fn hook_callback(code: i32, w_param: usize, l_param: isize) -> i
             // Send hook to next thread
             if let Some(hook_id) = HOOK_HANDLE {
                 winuser::CallNextHookEx(hook_id, code, w_param, l_param);
-            } else {
-                0;
-            }
+            };
         }
     }
 
@@ -69,12 +67,13 @@ extern "system" fn hook_callback(code: i32, w_param: usize, l_param: isize) -> i
 }
 
 /// convert u32 to char
+#[allow(clippy::if_same_then_else)]
 fn from_code_to_char(code: u32) -> String {
-    if code >= 65 && code <= 90 {
+    if (65..=90).contains(&code) {
         (code as u8 as char).to_string()
-    } else if code >= 48 && code <= 57 {
+    } else if (48..57).contains(&code) {
         (code as u8 as char).to_string()
     } else {
-        return format!("Unknow code: {}", code);
+        format!("Unknow code: {}", code)
     }
 }
