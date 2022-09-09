@@ -1071,6 +1071,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-test",
+ "winapi",
 ]
 
 [[package]]

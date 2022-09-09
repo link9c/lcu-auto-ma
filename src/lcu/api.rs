@@ -2,6 +2,7 @@
 
 // #![allow(dead_code)]
 use anyhow::Result;
+use reqwest::blocking;
 use reqwest::Client;
 use std::os::windows::process::CommandExt;
 use std::{
@@ -63,6 +64,7 @@ impl BaseInfo {
 #[derive(Default, Clone)]
 pub struct ApiClient {
     client: Option<Client>,
+    block_client: Option<blocking::Client>,
     base_url: String,
     token: String,
     pub init_error: Option<LcuError>,
@@ -77,6 +79,12 @@ impl ApiClient {
                     .danger_accept_invalid_certs(true)
                     .build()
                     .unwrap();
+
+                let block_client = reqwest::blocking::Client::builder()
+                    .danger_accept_invalid_certs(true)
+                    .build()
+                    .unwrap();
+                self.block_client = Some(block_client);
                 self.client = Some(client);
                 self.base_url = base_info.url;
                 self.token = base_info.token;
@@ -99,6 +107,12 @@ impl ApiClient {
         get_resp(url, self.client, self.token).await
     }
 
+    pub fn get_gameflow_phase_block(self) -> Result<Value> {
+        let url = self.base_url + "/lol-gameflow/v1/gameflow-phase";
+
+        get_resp_block(url, self.block_client, self.token)
+    }
+
     pub async fn get_summoner(self) -> Result<Value> {
         let url = self.base_url + "/lol-summoner/v1/current-summoner";
         get_resp(url, self.client, self.token).await
@@ -116,6 +130,23 @@ async fn get_resp(url: String, client: Option<Client>, token: String) -> Result<
                 .await?
                 .json::<Value>()
                 .await?;
+            Ok(resp)
+        }
+        None => Err(anyhow::anyhow!("not find client")),
+    }
+}
+
+fn get_resp_block(url: String, client: Option<blocking::Client>, token: String) -> Result<Value> {
+    println!("{}", url);
+    match client {
+        Some(cli) => {
+            let resp = cli
+                .get(url)
+                .basic_auth("riot", Some(token.as_str()))
+                .timeout(Duration::new(2, 0))
+                .send()?
+                .json::<Value>()?;
+
             Ok(resp)
         }
         None => Err(anyhow::anyhow!("not find client")),

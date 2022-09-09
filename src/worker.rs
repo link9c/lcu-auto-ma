@@ -55,6 +55,7 @@ pub enum Message {
     WokerConnect(WorkEvent),
     Refresh,
     SendMessage,
+    Auto,
 }
 
 pub fn factory(id: usize, state: WorkState) -> Subscription<WorkEvent> {
