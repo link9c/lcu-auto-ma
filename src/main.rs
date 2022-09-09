@@ -140,11 +140,11 @@ impl Application for MainUI {
 
 #[tokio::main]
 async fn main() {
-    // 监听键盘事件 发送信息
+    // 监听键盘事件线程 
     let _ = std::thread::spawn(|| {
         loop_send_by_key();
     });
-
+    // 循环处理线程 
     let _ = std::thread::spawn(|| loop {
         std::thread::sleep(std::time::Duration::new(2, 0));
         unsafe{
