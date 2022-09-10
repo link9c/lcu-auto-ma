@@ -16,10 +16,7 @@ lazy_static! {
         ac.init_client();
         ac
     }));
-    static ref CHATOOM: Arc<Mutex<GameSession>> = Arc::new(Mutex::new({
-        GameSession::default()
-       
-    }));
+    static ref CHATOOM: Arc<Mutex<GameSession>> = Arc::new(Mutex::new(GameSession::default()));
 }
 #[derive(Debug, Clone)]
 pub enum WorkEvent {
@@ -169,22 +166,26 @@ async fn get_game_flow(api: MutexGuard<'_, ApiClient>) -> LcuResult {
         }
     }
 }
-
+///获取战绩排名
+/// 850人机
+/// 
 async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) {
     let res = api.clone().get_session().await;
 
     if let Ok(game_session) = res {
         println!("{:?}", game_session);
         let users = game_session.myTeam;
+        let side_uses = game_session.theirTeam;
+        println!("other team{:?}", side_uses);
         let mut horse_room: Vec<HorseInfo> = Vec::new();
         for user in users {
             let mut hero_count: HashMap<u32, u8> = HashMap::new();
             let mut horse_info = HorseInfo::default();
-            if let Ok(user_info) = api
+            let user_result = api
                 .clone()
                 .get_summoners(user.summonerId.to_string().as_str())
-                .await
-            {
+                .await;
+            if let Ok(user_info) = user_result {
                 for index in 1..3_u32 {
                     if let Ok(matchs_history) =
                         api.clone().get_match_history(&user_info.puuid, index).await
@@ -193,7 +194,6 @@ async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) {
                             if game.queueId != 830 && game.queueId != 840 && game.queueId != 850 {
                                 let pt = &game.participants[0];
                                 let hero = pt.championId;
-                               
 
                                 hero_count
                                     .entry(hero)
@@ -223,10 +223,12 @@ async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) {
                 horse_info.user = user_info.displayName;
                 horse_info.summonerId = user_info.summonerId;
                 horse_room.push(horse_info);
+            } else {
+                println!("error:{:?}", user_result);
             }
         }
 
-        horse_room.sort_by_key(|x| x.win_rate().ceil() as u32);
+        horse_room.sort_by(|x, y| y.cmp(x));
         let length = horse_room.len();
         let chat_room = game_session
             .chatDetails
@@ -234,18 +236,19 @@ async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) {
             .split('@')
             .collect::<Vec<&str>>();
         for (i, horse) in horse_room.iter().enumerate() {
-            let mut rank = "上等马";
-            if i == 0 {
-                rank = "下等马"
-            } else if (1..length - 2).contains(&i) {
-                rank = "中等马"
-            }
+            let rank = if i == 0 {
+                "上等马"
+            } else if i == length - 1 {
+                "下等马"
+            } else {
+                "普通马"
+            };
             let mut body = SendInfo::default();
             let summ = api.clone().get_current_summoner().await.unwrap();
             body.fromId = summ.summonerId.to_string();
             body.fromSummonerId = horse.summonerId.to_string();
             body.body = format!("{}--{}", rank, horse.text());
-            println!("--{:?}--{:?}", body, chat_room);
+            // println!("--{:?}--{:?}", body, chat_room);
             let res = api.clone().send_message(chat_room[0], body).await;
             println!("{:?}", res);
         }

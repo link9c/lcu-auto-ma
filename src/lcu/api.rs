@@ -36,7 +36,7 @@ impl BaseInfo {
                     .replace('\r', "")
                     .replace('\n', "")
                     .replace(' ', "");
-                println!("{}", stdout_txt);
+                
                 if stdout_txt.contains("没有") {
                     Err(LcuError::NoEntity)
                 } else if stdout_txt == "CommandLine" {

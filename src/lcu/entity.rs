@@ -37,7 +37,7 @@ impl Default for SendInfo {
 ///马的优良评价
 ///
 ///
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, PartialOrd)]
 pub struct HorseInfo {
     pub deaths: u32,
     pub kills: u32,
@@ -47,7 +47,30 @@ pub struct HorseInfo {
     pub favhero: String,
     pub user: String,
 
-    pub summonerId:u32
+    pub summonerId: u64,
+}
+#[allow(clippy::derive_ord_xor_partial_ord)]
+impl Ord for HorseInfo {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.win + self.defeat > 15 {
+            if self.win_rate() > other.win_rate() {
+                std::cmp::Ordering::Greater
+            } else if self.win_rate() == other.win_rate() {
+                if self.KDA() > other.KDA() {
+                    std::cmp::Ordering::Greater
+                } else {
+                    std::cmp::Ordering::Less
+                }
+            } else {
+                std::cmp::Ordering::Less
+            }
+        } else if self.KDA() > other.KDA() {
+                std::cmp::Ordering::Greater
+            } else {
+                std::cmp::Ordering::Less
+            }
+        
+    }
 }
 
 impl HorseInfo {
@@ -63,29 +86,25 @@ impl HorseInfo {
         self.assists / (self.win + self.defeat)
     }
     pub fn win_rate(&self) -> f32 {
-        
         self.win as f32 / (self.win as f32 + self.defeat as f32)
-        
     }
 
-    fn KDA(&self) -> String {
-        format!(
-            "{}/{}/{}",
-            self.kill_avg(),
-            self.deaths_avg(),
-            self.assists_avg()
-        )
+    pub fn KDA(&self) -> f32 {
+        (((self.kill_avg() + self.assists_avg()) / self.deaths_avg()) * 3) as f32
     }
 
     pub fn text(&self) -> String {
         format!(
-            "{0} 胜{1}/输{2}(胜率{3:.2}) 场均KDA:{5}  常用英雄:{4}",
+            "{0} 胜{1}/输{2}(胜率{3:.2}) 场均击杀{6}/助攻{7}/死亡{8} KDA:{5:.2}  常用英雄:{4}",
             self.user,
             self.win,
             self.defeat,
             self.win_rate(),
             self.favhero,
-            self.KDA()
+            self.KDA(),
+            self.kill_avg(),
+            self.assists_avg(),
+            self.deaths_avg()
         )
     }
 }
@@ -137,8 +156,8 @@ pub struct Summoner {
     privacy: String,
     profileIconId: u32,
     pub puuid: String,
-    pub summonerId: u32,
-    pub summonerLevel: u16,
+    pub summonerId: u64,
+    pub summonerLevel: u32,
     unnamed: bool,
     xpSinceLastLevel: u32,
     xpUntilNextLevel: u32,
@@ -152,24 +171,34 @@ pub struct GameSession {
     pub actions: Vec<Vec<Actions>>,
     pub myTeam: Vec<MyTeam>,
     pub chatDetails: ChatDetails,
+    pub theirTeam: Vec<TheirTeam>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Actions {
-    actorCellId: u8,
+    actorCellId: u32,
     championId: u32,
     completed: bool,
-    pub id: u8,
+    pub id: u32,
     isAllyAction: bool,
     pub isInProgress: bool,
 }
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct MyTeam {
     assignedPosition: String,
-    cellId: u8,
-    championId: u8,
-    pub summonerId: u32,
-    team: u8,
+    cellId: u32,
+    championId: u32,
+    pub summonerId: u64,
+    team: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct TheirTeam {
+    assignedPosition: String,
+    cellId: u32,
+    championId: u32,
+    pub summonerId: u64,
+    team: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
