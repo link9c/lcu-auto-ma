@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use winapi;
 use winapi::shared::windef::HHOOK;
 use winapi::um::winuser;
@@ -6,7 +7,8 @@ use winapi::um::winuser::UnhookWindowsHookEx;
 use winapi::um::winuser::KBDLLHOOKSTRUCT;
 use winapi::um::winuser::{HC_ACTION, WH_KEYBOARD_LL};
 
-use super::api::ApiClient;
+use super::api::ApiClientBlock;
+
 
 static mut HOOK_HANDLE: Option<HHOOK> = None;
 
@@ -55,12 +57,12 @@ extern "system" fn hook_callback(code: i32, w_param: usize, l_param: isize) -> i
         let key = from_code_to_char(keypress.vkCode);
         println!("Was pressed {}", key);
         if keypress.vkCode == 112 {
-            let mut api = ApiClient::default();
+            let mut api = ApiClientBlock::default();
             api.init_client();
 
-            let s = api.get_gameflow_phase_block();
+            let s = api.get_gameflow_phase();
 
-            println!("{:?}", s);
+            println!("{:?}", s.unwrap().get(0));
         }
     }
     0

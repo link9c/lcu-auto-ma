@@ -3,7 +3,7 @@ mod lcu;
 mod worker;
 use iced::Alignment;
 // use anyhow::Result;
-use lcu::entity::{LcuPackage, SetErrDefault, Summoner};
+use lcu::entity::{match_err_then, LcuPackage, Summoner,LcuResult};
 use worker::{Message, WorkEvent, WorkInput, WorkMap, WorkerSender};
 // use std::collections::HashMap;\
 
@@ -14,14 +14,15 @@ use iced::{
 
 use lcu::winhook::loop_send_by_key;
 
-static mut AUTO:bool = false;
+static mut AUTO: bool = false;
 #[derive(Default)]
 pub struct MainUI {
     refresh_button: button::State,
     send_button: button::State,
-    auto_button:button::State,
+    auto_button: button::State,
     account: Option<Summoner>,
-
+    error_msg: String,
+    game_status:String,
     // api: ApiClient,
     worker_list: Vec<WorkMap>,
     work_sender: WorkerSender,
@@ -32,8 +33,10 @@ impl MainUI {
         MainUI {
             refresh_button: button::State::new(),
             send_button: button::State::new(),
-            auto_button:button::State::new(),
+            auto_button: button::State::new(),
             account: None,
+            error_msg: String::from(""),
+            game_status : String::from(""),
             // api: ApiClient::default(),
             worker_list: vec![WorkMap::new(0)],
             work_sender: WorkerSender::default(),
@@ -64,13 +67,14 @@ impl Application for MainUI {
         let send_button =
             Button::new(&mut self.send_button, Text::new("发送")).on_press(Message::SendMessage);
 
-            let auto_button =
+        let auto_button =
             Button::new(&mut self.auto_button, Text::new("自动发送")).on_press(Message::Auto);
 
         let header_line = Row::new()
             .push(refresh_button)
             .push(send_button)
             .push(auto_button)
+            .push(Text::new(self.game_status.clone()))
             .align_items(Alignment::Start);
         let display_name =
             Text::new(self.account.clone().unwrap_or_default().displayName).width(Length::Fill);
@@ -101,15 +105,14 @@ impl Application for MainUI {
                     self.work_sender.sender = Some(s);
                 }
                 WorkEvent::WorkReturn(lcu_result) => {
-                    println!("{:?}", lcu_result);
+                    // println!("{:?}", lcu_result);
                     match lcu_result {
-                        lcu::entity::LcuResult::Ok(pack) => match pack {
+                        LcuResult::Ok(pack) => match pack {
                             LcuPackage::Summoner(s) => self.account = Some(s),
+                            LcuPackage::Status(s) => {self.game_status=s},
                         },
-                        lcu::entity::LcuResult::Err(err) => {
-                            let mut sm = Summoner::default();
-                            sm.match_err_then(err);
-                            self.account = Some(sm);
+                        LcuResult::Err(err) => {
+                            self.error_msg = match_err_then(err);
                         }
                     };
                 }
@@ -123,11 +126,9 @@ impl Application for MainUI {
             Message::SendMessage => {
                 let _r = await_sender(self.work_sender.clone(), WorkInput::SendMessage);
             }
-            Message::Auto => {
-                unsafe {
-                    AUTO = !AUTO;
-                }
-            }
+            Message::Auto => unsafe {
+                AUTO = !AUTO;
+            },
         }
 
         Command::none()
@@ -140,21 +141,19 @@ impl Application for MainUI {
 
 #[tokio::main]
 async fn main() {
-    // 监听键盘事件线程 
-    let _ = std::thread::spawn(|| {
-        loop_send_by_key();
-    });
-    // 循环处理线程 
-    let _ = std::thread::spawn(|| loop {
-        std::thread::sleep(std::time::Duration::new(2, 0));
-        unsafe{
-            if AUTO {
-                println!("looping");
-            }
-        }
-        
-
-    });
+    // 监听键盘事件线程
+    // let _ = std::thread::spawn(|| {
+    //     loop_send_by_key();
+    // });
+    // 循环处理线程
+    // let _ = std::thread::spawn(|| loop {
+    //     std::thread::sleep(std::time::Duration::new(2, 0));
+    //     unsafe {
+    //         if AUTO {
+    //             println!("looping");
+    //         }
+    //     }
+    // });
 
     let _ = MainUI::run(Settings {
         window: window::Settings {
