@@ -1,28 +1,34 @@
-// #![windows_subsystem = "windows"]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod lcu;
+mod style;
 mod worker;
-use iced::Alignment;
+
+use iced::window::Icon;
 // use anyhow::Result;
-use lcu::entity::{match_err_then, LcuPackage, Summoner,LcuResult};
+use lcu::entity::{LcuPackage, LcuResult, SummonerCollection};
 use worker::{Message, WorkEvent, WorkInput, WorkMap, WorkerSender};
 // use std::collections::HashMap;\
-
 use iced::{
-    button, executor, window, Application, Button, Column, Command, Container, Element, Length,
-    Row, Settings, Subscription, Text,
+    alignment, executor, window, Application, Command, Element, Length, Settings, Subscription,
 };
 
-use lcu::winhook::loop_send_by_key;
+use iced::widget::{
+    button, image::Handle, scrollable, svg, Button, Column, Container, Image, Row, Scrollable, Svg,
+    Text,
+};
+
+// use lcu::winhook::loop_send_by_key;
 
 static mut AUTO: bool = false;
 #[derive(Default)]
 pub struct MainUI {
     refresh_button: button::State,
     send_button: button::State,
-    auto_button: button::State,
-    account: Option<Summoner>,
-    error_msg: String,
-    game_status:String,
+    scrollable: scrollable::State,
+    // auto_button: button::State,
+    account: Option<SummonerCollection>,
+    message: String,
+    game_status: String,
     // api: ApiClient,
     worker_list: Vec<WorkMap>,
     work_sender: WorkerSender,
@@ -33,13 +39,15 @@ impl MainUI {
         MainUI {
             refresh_button: button::State::new(),
             send_button: button::State::new(),
-            auto_button: button::State::new(),
+            // auto_button: button::State::new(),
             account: None,
-            error_msg: String::from(""),
-            game_status : String::from(""),
+            message: String::from(""),
+            game_status: String::from("未连接"),
+
             // api: ApiClient::default(),
             worker_list: vec![WorkMap::new(0)],
             work_sender: WorkerSender::default(),
+            scrollable: scrollable::State::new(),
         }
     }
 }
@@ -53,54 +61,90 @@ impl Application for MainUI {
     }
 
     fn title(&self) -> String {
-        String::from("一键喊话")
+        String::from("LOL赛马")
     }
 
     fn view(&mut self) -> Element<Message> {
-        // const XQFONT: Font = Font::External {
-        //     name: "方正字体",
-        //     bytes: include_bytes!("C:/Windows/Fonts/SIMYOU.TTF"), // 用 include_bytes 如果路径错误，会提示的
-        // };
+        let summ = self.account.clone().unwrap_or_default();
+
+        let s_avatar = Container::new(
+            Image::new(Handle::from_memory(summ.avatar))
+                .height(Length::Units(125))
+                .width(Length::Units(125)),
+        )
+        .height(Length::Units(125))
+        .width(Length::Units(125));
+
+        let s_name = Text::new(format!("名字:{}", summ.summor.displayName));
+        let s_level = Text::new(format!(
+            "等级:{}({}/{})",
+            summ.summor.summonerLevel, summ.summor.xpSinceLastLevel, summ.summor.xpUntilNextLevel
+        ));
+
+        let s_basic_info = Container::new(
+            Row::new()
+                .push(s_avatar)
+                .push(
+                    Column::new()
+                        .push(s_name)
+                        .push(s_level)
+                        .spacing(3)
+                        .width(Length::Fill),
+                )
+                .spacing(5),
+        )
+        .style(style::ContainerStyle)
+        .padding(10);
+
+        let log_text = Container::new(
+            Scrollable::new(&mut self.scrollable)
+                .push(
+                    Container::new(Text::new(self.message.clone()))
+                        .height(Length::Units(60))
+                        .padding(10),
+                )
+                .width(Length::Fill)
+                .height(Length::Fill),
+        )
+        .style(style::ContainerStyle);
+
+        let button_svg = Svg::new(svg::Handle::from_path(format!(
+            "{}/resource/refresh.svg",
+            env!("CARGO_MANIFEST_DIR")
+        )))
+        .width(Length::Units(30))
+        .height(Length::Units(20));
+
         let refresh_button =
-            Button::new(&mut self.refresh_button, Text::new("刷新")).on_press(Message::Refresh);
+            Button::new(&mut self.refresh_button, button_svg).on_press(Message::Refresh);
 
         let send_button =
             Button::new(&mut self.send_button, Text::new("发送")).on_press(Message::SendMessage);
+        let game_status = Container::new(
+            Text::new(format!("状态:{}", self.game_status.clone()))
+              
+        
+        ).height(Length::Units(30)).width(Length::Fill).align_y(alignment::Vertical::Center).align_x(alignment::Horizontal::Right);
+        let button_group = Container::new(
+            Row::new()
+                .push(send_button)
+                .push(refresh_button)
+                .push(game_status),
+        );
 
-        let auto_button =
-            Button::new(&mut self.auto_button, Text::new("自动发送")).on_press(Message::Auto);
+        let content = Column::new()
+            .push(s_basic_info)
+            .push(log_text)
+            .push(button_group)
+            .padding(5)
+            .spacing(5);
 
-        let header_line = Row::new()
-            .push(refresh_button)
-            .push(send_button)
-            .push(auto_button)
-            .push(Text::new(self.game_status.clone()))
-            .align_items(Alignment::Start);
-        let display_name =
-            Text::new(self.account.clone().unwrap_or_default().displayName).width(Length::Fill);
-
-        let row1_left = Row::new()
-            .push(Text::new("姓名:").width(Length::Units(40)))
-            .push(display_name);
-
-        let row1_right = Row::new()
-            .push(Text::new("id:").width(Length::Units(40)))
-            .push(Text::new("123456").width(Length::Fill));
-
-        let col = Row::new()
-            .push(row1_left.width(Length::Fill))
-            .push(row1_right.width(Length::Fill))
-            .align_items(Alignment::Center);
-
-        let content = Column::new().push(header_line).push(col).push(Text::new(
-            self.account.clone().unwrap_or_default().internalName,
-        ));
         Container::new(content).center_x().center_y().into()
     }
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
-            Message::WokerConnect(event) => match event {
+            Message::WokerConnect(event) => match *event {
                 WorkEvent::Ready(s) => {
                     self.work_sender.sender = Some(s);
                 }
@@ -108,20 +152,24 @@ impl Application for MainUI {
                     // println!("{:?}", lcu_result);
                     match lcu_result {
                         LcuResult::Ok(pack) => match pack {
-                            LcuPackage::Summoner(s) => self.account = Some(s),
-                            LcuPackage::Status(s) => {self.game_status=s},
+                            LcuPackage::Summoner(s) => {
+                                self.game_status = s.status.clone();
+                                self.account = Some(s);
+                            }
+                            LcuPackage::Message(s) => {
+                                self.message = s.message;
+                                self.game_status = s.status;
+                            }
                         },
                         LcuResult::Err(err) => {
-                            self.error_msg = match_err_then(err);
+                            self.message = err.to_string();
                         }
                     };
                 }
                 WorkEvent::Finished => {}
             },
             Message::Refresh => {
-                let r = await_sender(self.work_sender.clone(), WorkInput::Refresh);
-
-                println!("send result:{:?}", r);
+                let _r = await_sender(self.work_sender.clone(), WorkInput::Refresh);
             }
             Message::SendMessage => {
                 let _r = await_sender(self.work_sender.clone(), WorkInput::SendMessage);
@@ -155,17 +203,22 @@ async fn main() {
     //     }
     // });
 
+    
+       
+         
+    let icon = Icon::from_rgba(style::icon_raw::DATA.to_vec(), 32, 32).unwrap();
+   
     let _ = MainUI::run(Settings {
         window: window::Settings {
-            size: (440, 320),
+            size: (320, 257),
             min_size: Some((200, 100)),
             max_size: None,
-            resizable: true,
+            resizable: false,
             decorations: true,
             transparent: false,
             always_on_top: false,
-            position: window::Position::Specific(5, 466),
-            icon: None,
+            position: window::Position::Specific(750, 366),
+            icon: Some(icon),
         },
         // flags: c,
         default_font: Some(include_bytes!("../方正准圆简体.ttf")),

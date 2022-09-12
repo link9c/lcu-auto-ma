@@ -1,27 +1,37 @@
 [package]
 name = "lcu-app"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
+authors = ["bluebachelor"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0"
+# bytes ="1.2.1"
 chrono = "0.4.0"
 iced_native = "0.5.1"
+# jpeg-decoder = "0.2"
+# iced_wgpu = "0.5"
 lazy_static = "1.4.0"
 serde_json = "1.0.85"
-
+# std = { default-features = false, features=[ "panic_immediate_abort" ] }
 
 [dependencies.iced]
 version = "0.4"
 default-features = false
-features = ["glow", "tokio"]
+features = ["tokio", "image", "wgpu", "svg"]
+
+# [dependencies.image]
+# version = "0.24"
+# default-features = false
+# features = ["ico"]
 
 
 [dependencies.reqwest]
 version = "0.11"
-features = ["blocking", "json"]
+default-features = false
+features = ["blocking", "json", "default"]
 
 [dependencies.serde]
 version = "1.0"
@@ -29,7 +39,8 @@ features = ["derive"]
 
 [dependencies.tokio]
 version = "1.0"
-features = ["full"]
+default-features = false
+features = ["macros"]
 
 [dependencies.winapi]
 version = "0.3.9"
@@ -37,6 +48,14 @@ features = ["winuser"]
 
 [dev-dependencies]
 tokio-test = "*"
+
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "*"
+
+
 [profile.release]
 opt-level = "z"
 lto = true
+codegen-units = 1
+panic = "abort"

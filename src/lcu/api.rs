@@ -2,6 +2,7 @@
 
 #![allow(dead_code)]
 use anyhow::Result;
+// use bytes::Bytes;
 use reqwest::blocking;
 use reqwest::Client;
 use std::os::windows::process::CommandExt;
@@ -11,7 +12,6 @@ use std::{
 };
 
 use serde_json::Value;
-
 use super::entity::{GameSession, LcuError, MatchHistory, SendInfo, Summoner};
 use super::utils::parse_cmd_outoput;
 
@@ -36,7 +36,7 @@ impl BaseInfo {
                     .replace('\r', "")
                     .replace('\n', "")
                     .replace(' ', "");
-                
+
                 if stdout_txt.contains("没有") {
                     Err(LcuError::NoEntity)
                 } else if stdout_txt == "CommandLine" {
@@ -97,9 +97,30 @@ impl ApiClient {
     }
     /// 获取用户信息
     pub async fn get_summoners(self, id: &str) -> Result<Summoner> {
+        
         let url = self.base_url + "/lol-summoner/v1/summoners/" + id;
-
         get_resp(url, self.client, self.token).await
+    }
+
+    /// 获取用户头像
+    pub async fn get_avatar(self, id: &str) -> Result<Vec<u8>> {
+        let url = self.base_url + "/lol-game-data/assets/v1/profile-icons/" + id + ".jpg";
+
+        match self.client {
+            Some(cli) => {
+                let resp = cli
+                    .get(url)
+                    .basic_auth("riot", Some(self.token.as_str()))
+                    .timeout(Duration::new(2, 0))
+                    .send()
+                    .await?
+                    .bytes()
+                    .await?;
+               
+                Ok(resp.to_vec())
+            }
+            None => Err(anyhow::anyhow!("not find client")),
+        }
     }
     /// 获取选人界面session
     pub async fn get_session(self) -> Result<GameSession> {
@@ -108,7 +129,7 @@ impl ApiClient {
         get_resp(url, self.client, self.token).await
     }
     /// 英雄名称
-    pub async fn get_hero_name(self, id: u8) -> Result<Value> {
+    pub async fn get_hero_name(self, id: u32) -> Result<Value> {
         let url = format!(
             "{}/lol-game-data/assets/v1/champions/{}.json",
             self.base_url, id
@@ -118,7 +139,7 @@ impl ApiClient {
     }
 
     /// 游戏状态
-    pub async fn get_gameflow_phase(self) -> Result<Value> {
+    pub async fn get_gameflow_phase(self) -> Result<String> {
         let url = self.base_url + "/lol-gameflow/v1/gameflow-phase";
 
         get_resp(url, self.client, self.token).await
@@ -138,7 +159,7 @@ impl ApiClient {
             beg_index * 20
         );
         get_resp(url, self.client, self.token).await
-       
+
         // get_resp(url, self.client, self.token).await
     }
     /// 选人界面发送信息

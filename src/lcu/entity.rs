@@ -46,7 +46,7 @@ pub struct HorseInfo {
     pub defeat: u32,
     pub favhero: String,
     pub user: String,
-
+    
     pub summonerId: u64,
 }
 #[allow(clippy::derive_ord_xor_partial_ord)]
@@ -65,11 +65,10 @@ impl Ord for HorseInfo {
                 std::cmp::Ordering::Less
             }
         } else if self.KDA() > other.KDA() {
-                std::cmp::Ordering::Greater
-            } else {
-                std::cmp::Ordering::Less
-            }
-        
+            std::cmp::Ordering::Greater
+        } else {
+            std::cmp::Ordering::Less
+        }
     }
 }
 
@@ -90,7 +89,7 @@ impl HorseInfo {
     }
 
     pub fn KDA(&self) -> f32 {
-        (((self.kill_avg() + self.assists_avg()) / self.deaths_avg()) * 3) as f32
+        ((self.kill_avg() as f32 + self.assists_avg() as f32) / self.deaths_avg() as f32) * 3_f32
     }
 
     pub fn text(&self) -> String {
@@ -114,7 +113,7 @@ impl HorseInfo {
 ///
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MatchHistory {
-    pub accountId: u32,
+    pub accountId: u64,
     pub games: Games,
 }
 
@@ -143,24 +142,48 @@ pub struct Stats {
     pub win: bool,
 }
 
-/// 账号信息
+/// 个人信息汇总
 ///
+/// 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct SummonerCollection{
+    pub summor:Summoner,
+    pub status:String,
+    pub avatar:Vec<u8>
+}
+
+
+/// 返回状态等信息
+///
+/// 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct MessageCollection{
+    pub message:String,
+    pub status:String,
+
+}
+
+
+/// 账号信息
+/// 接口返回格式
 /// 获取姓名,id,等级等信息
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Summoner {
-    pub accountId: u32,
+    pub accountId: u64,
     pub displayName: String,
     pub internalName: String,
     // nameChangeFlag: bool,
     percentCompleteForNextLevel: u32,
     privacy: String,
-    profileIconId: u32,
+    pub profileIconId: u32,
     pub puuid: String,
     pub summonerId: u64,
     pub summonerLevel: u32,
     unnamed: bool,
-    xpSinceLastLevel: u32,
-    xpUntilNextLevel: u32,
+    pub xpSinceLastLevel: u32,
+    pub xpUntilNextLevel: u32,
+
+    // pub avatar:Vec<u8>
 }
 
 ///
@@ -207,20 +230,6 @@ pub struct ChatDetails {
     chatRoomPassword: Option<String>,
 }
 
-///
-///
-///
-pub fn match_err_then(err: LcuError) -> String {
-    match err {
-        LcuError::JsonParseFailed => String::from("json解析错误"),
-        LcuError::NoEntity => String::from("请开启游戏"),
-        LcuError::Other => String::from("其他未知错误"),
-        LcuError::NotAdmin => String::from("请用管理员权限运行"),
-        LcuError::NotFind => String::from(""),
-        LcuError::NotInitClient => String::from("未建立连接,请用管理员权限运行"),
-    }
-}
-
 /// 返回结果 json数据集或是错误数据集
 ///
 ///
@@ -235,8 +244,8 @@ pub enum LcuResult {
 ///
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum LcuPackage {
-    Summoner(Summoner),
-    Status(String),
+    Summoner(SummonerCollection),
+    Message(MessageCollection),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -247,12 +256,22 @@ pub enum LcuError {
     NotAdmin,
     NotFind,
     NotInitClient,
+    ChampionSelectSessionErrror,
 }
 
 impl std::error::Error for LcuError {}
 #[allow(clippy::recursive_format_impl)]
 impl fmt::Display for LcuError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        // write!(f, "{}", self)
+        match self {
+            LcuError::JsonParseFailed => write!(f, ""),
+            LcuError::NoEntity => write!(f, "请开启游戏"),
+            LcuError::Other => write!(f, "其他未知错误"),
+            LcuError::NotAdmin => write!(f, "请用管理员权限运行"),
+            LcuError::NotFind => write!(f, ""),
+            LcuError::NotInitClient => write!(f, "未建立连接,请用管理员权限运行"),
+            LcuError::ChampionSelectSessionErrror => write!(f, "未进入英雄选择界面,请开始游戏"),
+        }
     }
 }

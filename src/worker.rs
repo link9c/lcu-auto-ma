@@ -3,7 +3,10 @@ use std::sync::Arc;
 
 use crate::lcu::api::ApiClient;
 // use iced::{futures::channel::mpsc, Subscription};
-use crate::lcu::entity::{GameSession, HorseInfo, LcuError, LcuPackage, LcuResult, SendInfo};
+use crate::lcu::entity::{
+    GameSession, HorseInfo, LcuError, LcuPackage, LcuResult, MessageCollection, SendInfo,
+    SummonerCollection,
+};
 
 use iced_native::futures::channel::mpsc;
 use iced_native::subscription::{self, Subscription};
@@ -54,13 +57,13 @@ impl WorkMap {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    WokerConnect(WorkEvent),
+    WokerConnect(Box<WorkEvent>),
     Refresh,
     SendMessage,
     Auto,
 }
 
-pub fn factory(id: usize, state: WorkState) -> Subscription<WorkEvent> {
+pub fn factory(id: usize, state: WorkState) -> Subscription<Box<WorkEvent>> {
     subscription::unfold(id, state, |state| async move {
         match state {
             WorkState::Starting => {
@@ -68,14 +71,30 @@ pub fn factory(id: usize, state: WorkState) -> Subscription<WorkEvent> {
 
                 let _ = sender.start_send(WorkInput::Init);
 
-                (Some(WorkEvent::Ready(sender)), WorkState::Ready(receiver))
+                (
+                    Some(Box::new(WorkEvent::Ready(sender))),
+                    WorkState::Ready(receiver),
+                )
             }
+
             WorkState::Ready(mut receiver) => {
                 use iced_native::futures::StreamExt;
 
                 let input = receiver.select_next_some().await;
 
                 match input {
+                    WorkInput::Init => {
+                        let global_api_client = API.lock().await;
+                        let res = get_current_summoner(global_api_client).await;
+                        (
+                            Some(Box::new(WorkEvent::WorkReturn(res))),
+                            WorkState::Ready(receiver),
+                        )
+                    }
+
+                    WorkInput::Pending => {
+                        (Some(Box::new(WorkEvent::Finished)), WorkState::Finished)
+                    }
                     WorkInput::Refresh => {
                         println!("refresh");
                         let mut api = ApiClient::default();
@@ -84,30 +103,19 @@ pub fn factory(id: usize, state: WorkState) -> Subscription<WorkEvent> {
                         let mut global_api_client = API.lock().await;
                         *global_api_client = api;
 
-                        let summ = get_current_summoner(global_api_client).await;
+                        let res = get_current_summoner(global_api_client).await;
 
                         (
-                            Some(WorkEvent::WorkReturn(summ)),
+                            Some(Box::new(WorkEvent::WorkReturn(res))),
                             WorkState::Ready(receiver),
                         )
                     }
-                    WorkInput::Pending => (Some(WorkEvent::Finished), WorkState::Finished),
                     WorkInput::SendMessage => {
                         let global_api_client = API.lock().await;
-                        get_horse_rank_in_select_room(global_api_client).await;
+                        let res = get_horse_rank_in_select_room(global_api_client).await;
 
                         (
-                            Some(WorkEvent::WorkReturn(LcuResult::Ok(LcuPackage::Status(
-                                "ss".to_string(),
-                            )))),
-                            WorkState::Ready(receiver),
-                        )
-                    }
-                    WorkInput::Init => {
-                        let global_api_client = API.lock().await;
-                        let summ = get_current_summoner(global_api_client).await;
-                        (
-                            Some(WorkEvent::WorkReturn(summ)),
+                            Some(Box::new(WorkEvent::WorkReturn(res))),
                             WorkState::Ready(receiver),
                         )
                     }
@@ -135,29 +143,19 @@ async fn get_current_summoner(api: MutexGuard<'_, ApiClient>) -> LcuResult {
         let lcu_result = api.clone().get_current_summoner().await;
 
         match lcu_result {
-            Ok(v) => LcuResult::Ok(LcuPackage::Summoner(v)),
-            Err(e) => {
-                println!("{:#}", e);
-                LcuResult::Err(LcuError::JsonParseFailed)
-            }
-        }
-    }
-}
-
-async fn get_game_flow(api: MutexGuard<'_, ApiClient>) -> LcuResult {
-    if let Some(e) = api.init_error.clone() {
-        LcuResult::Err(e)
-    } else {
-        let lcu_result = api.clone().get_gameflow_phase().await;
-
-        match lcu_result {
             Ok(v) => {
-                let status = v.to_string().replace('\"', "");
-                if status == "None" {
-                    LcuResult::Ok(LcuPackage::Status(String::from("Room")))
-                } else {
-                    LcuResult::Ok(LcuPackage::Status(status))
-                }
+                let avatar = api
+                    .clone()
+                    .get_avatar(v.profileIconId.to_string().as_str())
+                    .await;
+
+                let status = api.clone().get_gameflow_phase().await;
+
+                LcuResult::Ok(LcuPackage::Summoner(SummonerCollection {
+                    summor: v,
+                    status: status.unwrap(),
+                    avatar: avatar.unwrap(),
+                }))
             }
             Err(e) => {
                 println!("{:#}", e);
@@ -166,10 +164,11 @@ async fn get_game_flow(api: MutexGuard<'_, ApiClient>) -> LcuResult {
         }
     }
 }
+
 ///获取战绩排名
-/// 850人机
-/// 
-async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) {
+///
+///
+async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) -> LcuResult {
     let res = api.clone().get_session().await;
 
     if let Ok(game_session) = res {
@@ -216,7 +215,7 @@ async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) {
                 // 获取最常用英雄
                 let mut hero = hero_count.iter().collect::<Vec<(&u32, &u8)>>();
                 hero.sort_by(|a, b| b.1.cmp(a.1));
-                let hero_id = hero[0].1;
+                let hero_id = hero[0].0;
 
                 let hero_name = api.clone().get_hero_name(*hero_id).await.unwrap();
                 horse_info.favhero = hero_name.get("name").unwrap().to_string().replace('\"', "");
@@ -235,6 +234,10 @@ async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) {
             .chatRoomName
             .split('@')
             .collect::<Vec<&str>>();
+        // let horse_ids = horse_room
+        //     .iter()
+        //     .map(|x| x.summonerId)
+        // .collect::<Vec<u64>>();
         for (i, horse) in horse_room.iter().enumerate() {
             let rank = if i == 0 {
                 "上等马"
@@ -243,14 +246,40 @@ async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) {
             } else {
                 "普通马"
             };
-            let mut body = SendInfo::default();
-            let summ = api.clone().get_current_summoner().await.unwrap();
-            body.fromId = summ.summonerId.to_string();
-            body.fromSummonerId = horse.summonerId.to_string();
-            body.body = format!("{}--{}", rank, horse.text());
-            // println!("--{:?}--{:?}", body, chat_room);
+
+            let text = format!("{}--{}", rank, horse.text());
+
+            let body = SendInfo {
+                body: text.clone(),
+                fromId: horse.summonerId.to_string(),
+                fromSummonerId: horse.summonerId.to_string(),
+                ..Default::default()
+            };
+
             let res = api.clone().send_message(chat_room[0], body).await;
             println!("{:?}", res);
+
+            // println!("--{:?}--{:?}", body, chat_room);
+
+            // }
         }
+        // let txt = horse_room
+        //     .iter()
+        //     .map(|x| x.text())
+        //     .collect::<Vec<String>>()
+        //     .join("\n");
+
+        let status = api
+            .clone()
+            .get_gameflow_phase()
+            .await
+            .unwrap_or(String::from("disconnect"));
+
+        LcuResult::Ok(LcuPackage::Message(MessageCollection {
+            message: String::from("发送成功"),
+            status: status,
+        }))
+    } else {
+        LcuResult::Err(LcuError::ChampionSelectSessionErrror)
     }
 }
