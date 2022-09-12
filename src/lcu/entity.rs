@@ -271,7 +271,7 @@ impl fmt::Display for LcuError {
             LcuError::NotAdmin => write!(f, "请用管理员权限运行"),
             LcuError::NotFind => write!(f, ""),
             LcuError::NotInitClient => write!(f, "未建立连接,请用管理员权限运行"),
-            LcuError::ChampionSelectSessionErrror => write!(f, "未进入英雄选择界面,请开始游戏"),
+            LcuError::ChampionSelectSessionErrror => write!(f, "请进入英雄选择界面"),
         }
     }
 }

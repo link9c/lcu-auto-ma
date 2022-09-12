@@ -156,7 +156,7 @@ async fn get_current_summoner(api: MutexGuard<'_, ApiClient>) -> LcuResult {
                     avatar: avatar.unwrap(),
                 }))
             }
-            Err(e) => {
+            Err(_e) => {
                 // println!("{:#}", e);
                 LcuResult::Err(LcuError::JsonParseFailed)
             }
@@ -173,7 +173,7 @@ async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) -> LcuRes
     if let Ok(game_session) = res {
         // println!("{:?}", game_session);
         let users = game_session.myTeam;
-        let side_uses = game_session.theirTeam;
+        // let side_uses = game_session.theirTeam;
         // println!("other team{:?}", side_uses);
         let mut horse_room: Vec<HorseInfo> = Vec::new();
         for user in users {
@@ -255,7 +255,7 @@ async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) -> LcuRes
                 ..Default::default()
             };
 
-            let res = api.clone().send_message(chat_room[0], body).await;
+            let _res = api.clone().send_message(chat_room[0], body).await;
             // println!("{:?}", res);
 
             // println!("--{:?}--{:?}", body, chat_room);
