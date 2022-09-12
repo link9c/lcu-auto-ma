@@ -96,7 +96,6 @@ pub fn factory(id: usize, state: WorkState) -> Subscription<Box<WorkEvent>> {
                         (Some(Box::new(WorkEvent::Finished)), WorkState::Finished)
                     }
                     WorkInput::Refresh => {
-                        println!("refresh");
                         let mut api = ApiClient::default();
                         api.init_client();
 
@@ -158,7 +157,7 @@ async fn get_current_summoner(api: MutexGuard<'_, ApiClient>) -> LcuResult {
                 }))
             }
             Err(e) => {
-                println!("{:#}", e);
+                // println!("{:#}", e);
                 LcuResult::Err(LcuError::JsonParseFailed)
             }
         }
@@ -172,10 +171,10 @@ async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) -> LcuRes
     let res = api.clone().get_session().await;
 
     if let Ok(game_session) = res {
-        println!("{:?}", game_session);
+        // println!("{:?}", game_session);
         let users = game_session.myTeam;
         let side_uses = game_session.theirTeam;
-        println!("other team{:?}", side_uses);
+        // println!("other team{:?}", side_uses);
         let mut horse_room: Vec<HorseInfo> = Vec::new();
         for user in users {
             let mut hero_count: HashMap<u32, u8> = HashMap::new();
@@ -211,7 +210,7 @@ async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) -> LcuRes
                         }
                     }
                 }
-                println!("{:?}", hero_count);
+                // println!("{:?}", hero_count);
                 // 获取最常用英雄
                 let mut hero = hero_count.iter().collect::<Vec<(&u32, &u8)>>();
                 hero.sort_by(|a, b| b.1.cmp(a.1));
@@ -257,7 +256,7 @@ async fn get_horse_rank_in_select_room(api: MutexGuard<'_, ApiClient>) -> LcuRes
             };
 
             let res = api.clone().send_message(chat_room[0], body).await;
-            println!("{:?}", res);
+            // println!("{:?}", res);
 
             // println!("--{:?}--{:?}", body, chat_room);
 
